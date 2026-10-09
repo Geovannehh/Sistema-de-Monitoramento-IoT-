@@ -1,0 +1,97 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: iot_manager
+      POSTGRES_USER: iot_manager
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Configure POSTGRES_PASSWORD}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U iot_manager -d iot_manager"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+  redis:
+    image: redis:7-alpine
+    environment:
+      REDIS_PASSWORD: ${REDIS_PASSWORD:?Configure REDIS_PASSWORD}
+    command: ["sh", "-c", "exec redis-server --appendonly yes --requirepass \"$$REDIS_PASSWORD\""]
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD-SHELL", "REDISCLI_AUTH=$$REDIS_PASSWORD redis-cli ping | grep PONG"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+  mqtt:
+    image: eclipse-mosquitto:2
+    user: "0:0"
+    entrypoint: ["sh", "/bootstrap/entrypoint.sh"]
+    environment:
+      MQTT_MANAGER_PASSWORD: ${MQTT_MANAGER_PASSWORD:?Configure MQTT_MANAGER_PASSWORD}
+      MQTT_DEVICE_001_PASSWORD: ${MQTT_DEVICE_001_PASSWORD:?Configure MQTT_DEVICE_001_PASSWORD}
+      MQTT_DEVICE_002_PASSWORD: ${MQTT_DEVICE_002_PASSWORD:?Configure MQTT_DEVICE_002_PASSWORD}
+      MQTT_DEVICE_003_PASSWORD: ${MQTT_DEVICE_003_PASSWORD:?Configure MQTT_DEVICE_003_PASSWORD}
+    ports:
+      - "127.0.0.1:1883:1883"
+    volumes:
+      - ./broker/mosquitto.conf:/mosquitto/config/mosquitto.conf:ro
+      - ./broker/entrypoint.sh:/bootstrap/entrypoint.sh:ro
+      - ./broker/provision-device.sh:/bootstrap/provision-device.sh:ro
+      - mqtt_data:/mosquitto/data
+  api:
+    build:
+      context: .
+      dockerfile: services/api/Dockerfile
+    environment:
+      DATABASE_URL: postgresql://iot_manager:${POSTGRES_PASSWORD}@postgres:5432/iot_manager
+      REDIS_URL: redis://:${REDIS_PASSWORD}@redis:6379
+      API_TOKEN: ${API_TOKEN:?Configure API_TOKEN}
+      MQTT_URL: mqtt://mqtt:1883
+      MQTT_USERNAME: manager
+      MQTT_PASSWORD: ${MQTT_MANAGER_PASSWORD}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      mqtt:
+        condition: service_started
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://localhost:8000/api/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+  frontend:
+    build:
+      context: .
+      dockerfile: frontend/Dockerfile
+    environment:
+      API_TOKEN: ${API_TOKEN}
+      NGINX_ENVSUBST_FILTER: API_TOKEN
+    ports:
+      - "127.0.0.1:3000:80"
+    depends_on:
+      api:
+        condition: service_healthy
+  simulator:
+    profiles: ["demo"]
+    build:
+      context: .
+      dockerfile: simulator/Dockerfile
+    environment:
+      MQTT_URL: mqtt://mqtt:1883
+      MQTT_DEVICE_001_PASSWORD: ${MQTT_DEVICE_001_PASSWORD}
+      MQTT_DEVICE_002_PASSWORD: ${MQTT_DEVICE_002_PASSWORD}
+      MQTT_DEVICE_003_PASSWORD: ${MQTT_DEVICE_003_PASSWORD}
+    volumes:
+      - simulator_state:/app/simulator/.state
+    depends_on:
+      api:
+        condition: service_healthy
+volumes:
+  postgres_data:
+  redis_data:
+  mqtt_data:
+  simulator_state:
