@@ -1,0 +1,27 @@
+{
+  "name": "iot-device-manager-api",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "start": "node dist/services/api/src/main.js",
+    "test": "node --test dist/services/api/src/protocol.test.js"
+  },
+  "dependencies": {
+    "@nestjs/common": "11.1.6",
+    "@nestjs/core": "11.1.6",
+    "@nestjs/platform-express": "11.1.6",
+    "mqtt": "5.14.1",
+    "pg": "8.16.3",
+    "redis": "4.7.1",
+    "reflect-metadata": "0.2.2",
+    "rxjs": "7.8.2",
+    "zod": "3.25.76"
+  },
+  "devDependencies": {
+    "@types/node": "22.19.19",
+    "@types/pg": "8.15.5",
+    "typescript": "5.9.3",
+    "@types/express": "5.0.3"
+  }
+}

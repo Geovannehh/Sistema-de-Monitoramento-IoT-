@@ -1,0 +1,1 @@
+{"name":"iot-device-simulator","version":"0.1.0","private":true,"type":"module","scripts":{"build":"esbuild client.ts --bundle --platform=node --format=esm --packages=external --outfile=dist/client.mjs","start":"node dist/client.mjs"},"dependencies":{"mqtt":"5.14.1","zod":"3.25.76"},"devDependencies":{"esbuild":"0.25.12"}}
